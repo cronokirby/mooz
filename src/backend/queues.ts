@@ -1,7 +1,7 @@
 /**
  * Represents a way to identify some recipient of a message.
  */
-type ID = string & { readonly __tag: unique symbol };
+export type ID = string & { readonly __tag: unique symbol };
 
 /**
  * Represents a queue along which we can send messages to specific identifiers.
@@ -11,7 +11,7 @@ type ID = string & { readonly __tag: unique symbol };
  * Messages are just blobs of data, represented by `any`. We know that we can serialize
  * them using JSON though.
  */
-interface MessageQueue {
+export interface MessageQueue {
   /**
    * Send a message to some recipient.
    *
@@ -21,7 +21,7 @@ interface MessageQueue {
    * @param message the data to send
    * @param to the identifier of the person to send the message to
    */
-  send(message: any, to: ID): void;
+  send(message: any, to: ID): Promise<void>;
   /**
    * Flush all of the pending messages for a user.
    *
@@ -30,7 +30,7 @@ interface MessageQueue {
    *
    * @param to the identifier of the person to read messages for
    */
-  pending(to: ID): ReadonlyArray<any>;
+  pending(to: ID): Promise<ReadonlyArray<any>>;
 }
 
 /**
@@ -42,17 +42,30 @@ interface MessageQueue {
  * context, you want to use one of the queues connected to Redis or DynamoDB, or
  * something like that.
  */
-export default class MemoryQueue implements MessageQueue {
+class MemoryQueue implements MessageQueue {
   private readonly _map = new Map<string, any[]>();
 
-  send(message: any, to: ID) {
+  async send(message: any, to: ID) {
     const messages = this._map.get(to) ?? [];
     this._map.set(to, [...messages, message]);
   }
 
-  pending(to: ID) {
+  async pending(to: ID) {
     const messages = this._map.get(to) ?? [];
     this._map.set(to, []);
     return messages;
   }
+}
+
+let instance: MessageQueue; 
+/**
+ * Get an instance of a message queue to use.
+ *
+ * This will choose the right queue based on the environment.
+ */
+export async function getMessageQueue(): Promise<MessageQueue> {
+  if (!instance) {
+    instance = new MemoryQueue();
+  }
+  return instance;
 }
