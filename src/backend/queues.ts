@@ -1,4 +1,4 @@
-import { ID } from '../identifier';
+import type { ID } from '../identifier';
 
 /**
  * Represents a queue along which we can send messages to specific identifiers.

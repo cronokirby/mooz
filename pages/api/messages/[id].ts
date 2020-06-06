@@ -1,5 +1,6 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { getMessageQueue, ID } from '../../../src/backend/queues';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getMessageQueue } from '../../../src/backend/queues';
+import type { ID } from '../../../src/identifier';
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method === 'GET') {
