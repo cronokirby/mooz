@@ -53,6 +53,7 @@ export default class Signaller {
       await wait(this.timeout);
       const result = await get(`/api/messages/${this.id}`);
       for (const m of result.messages) {
+        console.log('message', m);
         for (const cb of this.cbs) {
           cb(m);
         }
@@ -69,6 +70,7 @@ export default class Signaller {
    * @param to the identifier to send a message to
    */
   async send(message: any, to: ID) {
+    console.log('sending', message, to);
     const tagged = { ...message, from: this.id };
     await postData(`/api/messages/${to}`, tagged);
   }
