@@ -42,18 +42,13 @@ function Room(props: { signaller: Signaller; call?: ID }) {
     if (!theirVideoRef.current || !myStream) {
       return;
     }
-    let conn: RTCPeerConnection;
-    if (props.call) {
-      conn = await makeCall(props.call, props.signaller);
-    } else {
-      conn = await listen(props.signaller);
-    }
-    myStream.getTracks().forEach((track) => conn.addTrack(track, myStream));
     const remoteStream = new MediaStream();
     theirVideoRef.current.srcObject = remoteStream;
-    conn.addEventListener('track', (event) =>
-      remoteStream.addTrack(event.track),
-    );
+    if (props.call) {
+      await makeCall(props.call, props.signaller, myStream, remoteStream);
+    } else {
+      await listen(props.signaller, myStream, remoteStream);
+    }
   };
 
   React.useEffect(() => {
