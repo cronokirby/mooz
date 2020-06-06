@@ -42,7 +42,7 @@ export default class Signaller {
    *
    * @param timeout the number of milliseconds to wait between messages
    */
-  constructor(private readonly timeout = 500) {
+  constructor(private readonly timeout = 1000) {
     const id = newID();
     this.id = id;
   }
