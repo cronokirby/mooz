@@ -19,19 +19,14 @@ function Home() {
   const [text, setText] = React.useState('');
   const { current: signaller } = React.useRef(new Signaller());
 
+  React.useEffect(
+    () => signaller.onMessage((m) => setMessages((ms) => [...ms, m])),
+    [],
+  );
+
   const sendMessage = () => {
     signaller.send({ data: text }, to as ID);
   };
-
-  const listenToMessages = async () => {
-    for await (const message of signaller) {
-      setMessages((ms) => [...ms, message]);
-    }
-  };
-
-  React.useEffect(() => {
-    listenToMessages();
-  }, []);
 
   return (
     <>

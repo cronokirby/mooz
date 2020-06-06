@@ -23,13 +23,16 @@ async function wait(ms: number) {
 /**
  * A signaller allows us to send and receive events about
  */
-export default class Signaller implements AsyncIterable<any> {
+export default class Signaller {
   /**
    * The identifier associated with this client.
    *
    * This is useful in order to share with others, so they'll be able to send you messages.
    */
   public readonly id: ID;
+
+  private readonly cbs: ((msg: any) => void)[] = [];
+  private started = false;
 
   /**
    * Create a new signaller.
@@ -40,9 +43,22 @@ export default class Signaller implements AsyncIterable<any> {
    * @param timeout the number of milliseconds to wait between messages
    */
   constructor(private readonly timeout = 500) {
-    this.id = newID();
+    const id = newID();
+    this.id = id;
   }
 
+  private async startCallbacks() {
+    this.started = true;
+    for (;;) {
+      await wait(this.timeout);
+      const result = await get(`/api/messages/${this.id}`);
+      for (const m of result.messages) {
+        for (const cb of this.cbs) {
+          cb(m);
+        }
+      }
+    }
+  }
   /**
    * Send a message to some identifier
    *
@@ -57,18 +73,15 @@ export default class Signaller implements AsyncIterable<any> {
     await postData(`/api/messages/${to}`, tagged);
   }
 
-  // Dunno why we can't make Symbol.asyncIterator a generator directly.
-  private async *iter() {
-    for (;;) {
-      const result = await get(`/api/messages/${this.id}`);
-      for (const m of result.messages) {
-        yield m;
-      }
-      await wait(this.timeout);
+  /**
+   * Set a callback to call whenever a new message arrives
+   *
+   * @param cb the function to call
+   */
+  onMessage(cb: (message: any) => void) {
+    if (!this.started) {
+      this.startCallbacks();
     }
-  }
-
-  [Symbol.asyncIterator]() {
-    return this.iter();
+    this.cbs.push(cb);
   }
 }
