@@ -11,13 +11,18 @@ function setupConn(
   signaller: Signaller,
   localStream: MediaStream,
   remoteStream: MediaStream,
+  candidates: any[],
 ): RTCPeerConnection {
   const configuration = { iceServers: ICE_SERVERS };
   const conn = new RTCPeerConnection(configuration);
-  // 1. Handle new ice candidates
+  const leftOver = [] as any[];
   signaller.onMessage((msg) => {
     if (msg.data.icecandidate) {
-      conn.addIceCandidate(msg.data.icecandidate);
+      if (conn.remoteDescription) {
+        conn.addIceCandidate(msg.data.icecandidate);
+      } else {
+        candidates.push(msg.data.icecandidate);
+      }
     }
   });
   // 2. Add a callback for handling new tracks
@@ -35,7 +40,8 @@ export async function makeCall(
 ) {
   const sendMessage = (msg: any) => signaller.send(msg, to);
 
-  const conn = setupConn(signaller, localStream, remoteStream);
+  const candidates: any[] = [];
+  const conn = setupConn(signaller, localStream, remoteStream, candidates);
   // 4. Create the offer
   const offer = await conn.createOffer();
   // 5. Set the offer as our local description
@@ -51,6 +57,9 @@ export async function makeCall(
     if (msg.data.answer) {
       // 13. Receive the answer, set as remote description
       await conn.setRemoteDescription(msg.data.answer);
+      for (const candidate of candidates) {
+        await conn.addIceCandidate(candidate);
+      }
     }
   });
 }
@@ -69,13 +78,17 @@ export async function listen(
     }
   };
 
-  const conn = setupConn(signaller, localStream, remoteStream);
+  const candidates: any[] = [];
+  const conn = setupConn(signaller, localStream, remoteStream, candidates);
 
   signaller.onMessage(async (msg) => {
     if (msg.data.offer) {
       to = msg.from;
       // 8. Receive the offer, set as remote description
       await conn.setRemoteDescription(msg.data.offer);
+      for (const candidate of candidates) {
+        await conn.addIceCandidate(candidate);
+      }
       // 9. Create the answer
       const answer = await conn.createAnswer();
       // 10. Set answer as local description
