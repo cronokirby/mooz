@@ -5,6 +5,11 @@ import type { ID } from '../identifier';
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:global.stun.twilio.com:3478?transport=udp' },
+  {
+    url: 'turn:turn.anyfirewall.com:443?transport=tcp',
+    credential: 'webrtc',
+    username: 'webrtc',
+  },
 ];
 
 function setupConn(
@@ -52,7 +57,7 @@ export async function makeCall(
       // 13. Receive the answer, set as remote description
       await conn.setRemoteDescription(msg.data.answer);
     }
-  })
+  });
 }
 
 export async function listen(
