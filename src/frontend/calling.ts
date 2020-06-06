@@ -6,7 +6,7 @@ const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:global.stun.twilio.com:3478?transport=udp' },
   {
-    url: 'turn:turn.anyfirewall.com:443?transport=tcp',
+    urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
     credential: 'webrtc',
     username: 'webrtc',
   },
