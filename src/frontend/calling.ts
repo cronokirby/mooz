@@ -50,7 +50,9 @@ export async function makeCall(
   await sendMessage({ data: { offer } });
   // 7. Listen for new ice candidates, inform the remote peer
   conn.onicecandidate = (event) => {
-    sendMessage({ data: { icecandidate: event.candidate } });
+    if (event.candidate) {
+      sendMessage({ data: { icecandidate: event.candidate } });
+    }
   };
 
   signaller.onMessage(async (msg) => {
@@ -95,7 +97,9 @@ export async function listen(
       await conn.setLocalDescription(answer);
       // 11. Start our own ice gathering process
       conn.onicecandidate = (event) => {
-        sendMessage({ data: { icecandidate: event.candidate } });
+        if (event.candidate) {
+          sendMessage({ data: { icecandidate: event.candidate } });
+        }
       };
       // 12. Send our answer back
       await sendMessage({ data: { answer } });
