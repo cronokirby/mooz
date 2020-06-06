@@ -1,7 +1,4 @@
-/**
- * Represents a way to identify some recipient of a message.
- */
-export type ID = string & { readonly __tag: unique symbol };
+import { ID } from '../identifier';
 
 /**
  * Represents a queue along which we can send messages to specific identifiers.
@@ -57,7 +54,7 @@ class MemoryQueue implements MessageQueue {
   }
 }
 
-let instance: MessageQueue; 
+let instance: MessageQueue;
 /**
  * Get an instance of a message queue to use.
  *
