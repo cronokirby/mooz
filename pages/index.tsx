@@ -1,7 +1,6 @@
 import Head from 'next/head';
 import React from 'react';
 import Signaller from '../src/frontend/Signaller';
-import type { ID } from '../src/identifier';
 
 function Messages(props: { messages: any[] }) {
   return (
@@ -13,33 +12,51 @@ function Messages(props: { messages: any[] }) {
   );
 }
 
-function Home() {
-  const [messages, setMessages] = React.useState<any[]>([]);
-  const [to, setTo] = React.useState('');
-  const [text, setText] = React.useState('');
-  const { current: signaller } = React.useRef(new Signaller());
+function MyRoom(props: { signaller: Signaller }) {
+  const myVideoRef = React.useRef(null as HTMLVideoElement | null);
+  const [error, setError] = React.useState('');
 
-  React.useEffect(
-    () => signaller.onMessage((m) => setMessages((ms) => [...ms, m])),
-    [],
-  );
-
-  const sendMessage = () => {
-    signaller.send({ data: text }, to as ID);
+  const setup = async () => {
+    if (!myVideoRef.current) {
+      return;
+    }
+    try {
+      const constraints = { video: true, audio: true };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      myVideoRef.current.srcObject = stream;
+    } catch (error) {
+      setError(`Error setting up video: ${error}`);
+    }
   };
+
+  React.useEffect(() => {
+    setup();
+  }, [myVideoRef]);
 
   return (
     <>
-      <h2>Your ID:</h2>
-      <p>{signaller.id}</p>
-      <h2>Send a Message To:</h2>
-      <input onChange={(e) => setTo(e.target.value)}></input>
-      <textarea onChange={(e) => setText(e.target.value)}></textarea>
-      <button onClick={sendMessage}>Send</button>
-      <h2>Your Messages:</h2>
-      <Messages messages={messages} />
+      <h2>Your Meeting ID:</h2>
+      <p>{props.signaller.id}</p>
+      <video autoPlay playsInline controls={false} ref={myVideoRef} muted></video>
+      <p>{error}</p>
     </>
   );
+}
+
+function Home() {
+  const [signaller, setSignaller] = React.useState<null | Signaller>(null);
+
+  if (signaller) {
+    return <MyRoom signaller={signaller} />;
+  } else {
+    return (
+      <>
+        <button onClick={() => setSignaller(new Signaller())}>
+          Create Meeting
+        </button>
+      </>
+    );
+  }
 }
 
 export default function HomePage() {
