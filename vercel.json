@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "scope": "cronokirby",
+  "env": {
+    "PUSHER_SECRET": "@mooz_pusher_secret"
+  },
+  "build": {
+    "env": {
+      "PUSHER_SECRET": "@mooz_pusher_secret"
+    }
+  }
+}
