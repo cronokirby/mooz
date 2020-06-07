@@ -1,4 +1,14 @@
+import Pusher from 'pusher-js';
 import { ID, newID } from '../identifier';
+
+let pusher: Pusher | undefined;
+
+function getPusherInstance(): Pusher {
+  if (!pusher) {
+    pusher = new Pusher('6571d8c516428778fa06', { cluster: 'eu' });
+  }
+  return pusher;
+}
 
 async function postData(url: string, data: any) {
   const response = await fetch(url, {
@@ -11,14 +21,12 @@ async function postData(url: string, data: any) {
   return response.json();
 }
 
-async function get(url: string) {
-  const response = await fetch(url);
-  return response.json();
-}
-
 async function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+const LIMIT = 4;
+const TIMEOUT = 1100;
 
 /**
  * A signaller allows us to send and receive events about
@@ -31,35 +39,43 @@ export default class Signaller {
    */
   public readonly id: ID;
 
+  private readonly pusher: Pusher;
   private readonly cbs: ((msg: any) => void)[] = [];
-  private started = false;
+  private readonly pending: any[] = [];
+  private i = 0;
 
   /**
    * Create a new signaller.
-   *
-   * Since we use polling for detecting messages, we can pass a timeout specifying
-   * how often to poll for new messages.
-   *
-   * @param timeout the number of milliseconds to wait between messages
    */
-  constructor(private readonly timeout = 1000) {
+  constructor() {
+    this.pusher = getPusherInstance();
     const id = newID();
     this.id = id;
-  }
-
-  private async startCallbacks() {
-    this.started = true;
-    for (;;) {
-      await wait(this.timeout);
-      const result = await get(`/api/messages/${this.id}`);
-      for (const m of result.messages) {
-        console.log('message', m);
-        for (const cb of this.cbs) {
-          cb(m);
+    const channel = this.pusher.subscribe(id);
+    channel.bind('signal', (data: any) => {
+      console.log('signal', data);
+      for (const cb of this.cbs) {
+        cb(data);
+      }
+    });
+    (async () => {
+      for (;;) {
+        await wait(TIMEOUT);
+        for (let j = 0; j < LIMIT; ++j) {
+          if (this.i >= this.pending.length) {
+            break;
+          }
+          console.log('sending index', this.i);
+          const { message, to } = this.pending[this.i];
+          const tagged = { ...message, from: id };
+          console.log('sending', message, to);
+          await postData(`/api/messages/${to}`, tagged);
+          ++this.i;
         }
       }
-    }
+    })();
   }
+
   /**
    * Send a message to some identifier
    *
@@ -70,9 +86,7 @@ export default class Signaller {
    * @param to the identifier to send a message to
    */
   async send(message: any, to: ID) {
-    console.log('sending', message, to);
-    const tagged = { ...message, from: this.id };
-    await postData(`/api/messages/${to}`, tagged);
+    this.pending.push({ message, to });
   }
 
   /**
@@ -81,9 +95,6 @@ export default class Signaller {
    * @param cb the function to call
    */
   onMessage(cb: (message: any) => void) {
-    if (!this.started) {
-      this.startCallbacks();
-    }
     this.cbs.push(cb);
   }
 }
