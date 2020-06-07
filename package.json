@@ -11,12 +11,14 @@
     "next": "^9.3.3",
     "react": "^16.13.0",
     "react-dom": "^16.13.0",
+    "simple-peer": "^9.7.2",
     "uuidv4": "^6.1.0",
     "webrtc-adapter": "^7.6.1"
   },
   "devDependencies": {
     "@types/node": "^14.0.11",
     "@types/react": "^16.9.35",
+    "@types/simple-peer": "^9.6.0",
     "typescript": "^3.9.5"
   }
 }

@@ -42,12 +42,20 @@ function Room(props: { signaller: Signaller; call?: ID }) {
     if (!theirVideoRef.current || !myStream) {
       return;
     }
-    const remoteStream = new MediaStream();
-    theirVideoRef.current.srcObject = remoteStream;
+    let remoteStream: MediaStream;
     if (props.call) {
-      await makeCall(props.call, props.signaller, myStream, remoteStream);
+      remoteStream = await makeCall(props.call, props.signaller, myStream);
+      console.log('got remote stream after calling');
     } else {
-      await listen(props.signaller, myStream, remoteStream);
+      remoteStream = await listen(props.signaller, myStream);
+      console.log('got remote stream after listenning');
+    }
+    const video = theirVideoRef.current;
+    if ('srcObject' in video) {
+      video.srcObject = remoteStream
+    } else {
+      // For older browsers
+      (video as any).src = window.URL.createObjectURL(remoteStream)
     }
   };
 
