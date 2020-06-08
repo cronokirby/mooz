@@ -42,11 +42,10 @@ export default class Signaller {
   /**
    * Create a new signaller.
    */
-  constructor() {
+  constructor(id?: ID) {
     this.pusher = getPusherInstance();
-    const id = newID();
-    this.id = id;
-    const channel = this.pusher.subscribe(id);
+    this.id = id ?? newID();
+    const channel = this.pusher.subscribe(this.id);
     channel.bind('signal', (data: any) => {
       console.log('signal', data);
       for (const cb of this.cbs) {
