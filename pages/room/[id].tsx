@@ -77,7 +77,6 @@ interface Props {
 }
 
 export default function Page({ id, created }: Props) {
-  console.log('props', { id, created });
   const [signaller, setSignaller] = React.useState(null as Signaller | null);
 
   React.useEffect(() => {
@@ -96,6 +95,5 @@ export default function Page({ id, created }: Props) {
 }
 
 Page.getInitialProps = async (ctx: NextPageContext) => {
-  console.log(ctx.query);
   return { id: ctx.query.id, created: ctx.query.created };
 };
