@@ -25,9 +25,6 @@ async function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const LIMIT = 4;
-const TIMEOUT = 1100;
-
 /**
  * A signaller allows us to send and receive events about
  */
@@ -41,8 +38,6 @@ export default class Signaller {
 
   private readonly pusher: Pusher;
   private readonly cbs: ((msg: any) => void)[] = [];
-  private readonly pending: any[] = [];
-  private i = 0;
 
   /**
    * Create a new signaller.
@@ -58,22 +53,6 @@ export default class Signaller {
         cb(data);
       }
     });
-    (async () => {
-      for (;;) {
-        await wait(TIMEOUT);
-        for (let j = 0; j < LIMIT; ++j) {
-          if (this.i >= this.pending.length) {
-            break;
-          }
-          console.log('sending index', this.i);
-          const { message, to } = this.pending[this.i];
-          const tagged = { ...message, from: id };
-          console.log('sending', message, to);
-          await postData(`/api/messages/${to}`, tagged);
-          ++this.i;
-        }
-      }
-    })();
   }
 
   /**
@@ -86,7 +65,9 @@ export default class Signaller {
    * @param to the identifier to send a message to
    */
   async send(message: any, to: ID) {
-    this.pending.push({ message, to });
+    console.log('sending', message, to);
+    const tagged = { ...message, from: this.id };
+    await postData(`/api/messages/${to}`, tagged);
   }
 
   /**
