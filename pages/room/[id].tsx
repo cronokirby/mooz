@@ -36,10 +36,35 @@ function ShareButton({ id }: { id: ID }) {
   return <Button onClick={share}>{icons.Share(32)}</Button>;
 }
 
-function Buttons({ id }: { id: ID }) {
+function isMuted(media: MediaStream) {
+  return !media.getAudioTracks()[0].enabled;
+}
+
+function toggleMute(media: MediaStream) {
+  media.getAudioTracks()[0].enabled = !media.getAudioTracks()[0].enabled;
+}
+
+function MuteButton({ media }: { media: MediaStream }) {
+  console.log(isMuted(media));
+  const [muted, setMuted] = React.useState(isMuted(media));
+
+  const onClick = () => {
+    toggleMute(media);
+    setMuted((m) => !m);
+  };
+
   return (
-    <div className="absolute left-0 bottom-0 p-8 md:p-16 flex items-col justify-between space-y-4">
+    <Button onClick={onClick}>
+      {muted ? icons.MicOff(32) : icons.MicOn(32)}
+    </Button>
+  );
+}
+
+function Buttons({ id, media }: { id: ID; media: MediaStream | null }) {
+  return (
+    <div className="absolute left-0 bottom-0 p-8 md:p-16 flex flex-col justify-between space-y-4">
       <ShareButton id={id} />
+      {!media ? null : <MuteButton media={media} />}
     </div>
   );
 }
@@ -118,7 +143,7 @@ function Room(props: { signaller: Signaller; call?: ID }) {
           muted
         ></video>
       </div>
-      <Buttons id={props.call ?? props.signaller.id} />
+      <Buttons id={props.call ?? props.signaller.id} media={myStream} />
     </div>
   );
 }
