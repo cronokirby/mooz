@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "next": "^9.3.3",
+    "postcss-preset-env": "^6.7.0",
     "pusher": "^3.0.1",
     "pusher-js": "^6.0.3",
     "react": "^16.13.0",
@@ -21,6 +22,7 @@
     "@types/node": "^14.0.11",
     "@types/react": "^16.9.35",
     "@types/simple-peer": "^9.6.0",
+    "tailwindcss": "^1.4.6",
     "typescript": "^3.9.5"
   }
 }
