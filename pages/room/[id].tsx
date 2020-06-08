@@ -10,6 +10,7 @@ function Room(props: { signaller: Signaller; call?: ID }) {
   const theirVideoRef = React.useRef(null as HTMLVideoElement | null);
   const [myStream, setMyStream] = React.useState(null as MediaStream | null);
   const [error, setError] = React.useState('');
+  const [connected, setConnected] = React.useState(false);
 
   const setupMyStream = async () => {
     if (!myVideoRef.current) {
@@ -48,6 +49,7 @@ function Room(props: { signaller: Signaller; call?: ID }) {
       // For older browsers
       (video as any).src = window.URL.createObjectURL(remoteStream);
     }
+    setConnected(true)
   };
 
   React.useEffect(() => {
@@ -55,19 +57,19 @@ function Room(props: { signaller: Signaller; call?: ID }) {
   }, [myStream, theirVideoRef]);
 
   return (
-    <>
-      <h2>Your Meeting ID:</h2>
-      <p>{props.signaller.id}</p>
-      <video
-        autoPlay
-        playsInline
-        controls={false}
-        ref={myVideoRef}
-        muted
-      ></video>
-      <video autoPlay playsInline controls={false} ref={theirVideoRef}></video>
-      <p>{error}</p>
-    </>
+    <div className={`transition-colors duration-500 w-full h-screen relative ${connected ? 'bg-gray-900' : 'bg-main-100'}`}>
+      <video autoPlay playsInline controls={false} ref={theirVideoRef} className="w-full h-full"></video>
+      <div className="rounded-md shadow-lg mt-8 mr-8 mb-8 w-32 sm:w-48 lg:w-64 absolute right-0 top-0 sm:top-auto sm:bottom-0">
+        <video
+          className="rounded-md w-full"
+          autoPlay
+          playsInline
+          controls={false}
+          ref={myVideoRef}
+          muted
+        ></video>
+      </div>
+    </div>
   );
 }
 
