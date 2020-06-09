@@ -4,6 +4,7 @@ import * as icons from '../../components/icons';
 import { listen, makeCall } from '../../src/frontend/calling';
 import Signaller from '../../src/frontend/Signaller';
 import type { ID } from '../../src/identifier';
+import { getWebCamMedia, getWaitingMedia } from '../../src/frontend/media';
 
 interface ButtonProps {
   onClick(): void;
@@ -12,7 +13,7 @@ interface ButtonProps {
 function Button(props: React.PropsWithChildren<ButtonProps>) {
   return (
     <button
-      className="p-2 rounded-full bg-main-700 hover:bg-main-500 transition-colors duration-500 shadow-lg text-white"
+      className="p-2 text-white transition-colors duration-500 rounded-full shadow-lg bg-main-700 hover:bg-main-500"
       onClick={props.onClick}
     >
       {props.children}
@@ -37,11 +38,19 @@ function ShareButton({ id }: { id: ID }) {
 }
 
 function isMuted(media: MediaStream) {
-  return !media.getAudioTracks()[0].enabled;
+  const track = media.getAudioTracks()[0];
+  if (!track) {
+    return true;
+  }
+  return !track.enabled;
 }
 
 function toggleMute(media: MediaStream) {
-  media.getAudioTracks()[0].enabled = !media.getAudioTracks()[0].enabled;
+  const track = media.getAudioTracks()[0];
+  if (!track) {
+    return;
+  }
+  track.enabled = !track.enabled;
 }
 
 function MuteButton({ media }: { media: MediaStream }) {
@@ -62,7 +71,7 @@ function MuteButton({ media }: { media: MediaStream }) {
 
 function Buttons({ id, media }: { id: ID; media: MediaStream | null }) {
   return (
-    <div className="absolute left-0 bottom-0 p-8 md:p-16 flex flex-col justify-between space-y-4">
+    <div className="absolute bottom-0 left-0 flex flex-col justify-between p-8 space-y-4 md:p-16">
       <ShareButton id={id} />
       {!media ? null : <MuteButton media={media} />}
     </div>
@@ -72,38 +81,45 @@ function Buttons({ id, media }: { id: ID; media: MediaStream | null }) {
 function Room(props: { signaller: Signaller; call?: ID }) {
   const myVideoRef = React.useRef(null as HTMLVideoElement | null);
   const theirVideoRef = React.useRef(null as HTMLVideoElement | null);
-  const [myStream, setMyStream] = React.useState(null as MediaStream | null);
+  const waitingVideoRef = React.useRef(null as HTMLVideoElement | null);
+  const [myCamera, setMyCamera] = React.useState(null as MediaStream | null);
+  const [myWaiting, setMyWaiting] = React.useState(null as MediaStream | null);
   const [error, setError] = React.useState('');
   const [connected, setConnected] = React.useState(false);
 
-  const setupMyStream = async () => {
-    if (!myVideoRef.current) {
+  const setupMyWaiting = async () => {};
+
+  const setupMyCamera = async () => {
+    if (!myVideoRef.current || !waitingVideoRef.current) {
       return;
     }
     try {
-      const constraints = { video: true, audio: true };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await getWebCamMedia();
+      if (!stream) {
+        return;
+      }
       myVideoRef.current.srcObject = stream;
-      setMyStream(stream);
+      setMyCamera(stream);
     } catch (error) {
+      console.warn('error setting up video', error);
       setError(`Error setting up video: ${error}`);
     }
   };
 
   React.useEffect(() => {
-    setupMyStream();
-  }, [myVideoRef]);
+    setupMyCamera();
+  }, [myVideoRef, waitingVideoRef]);
 
   const setupTheirStream = async () => {
-    if (!theirVideoRef.current || !myStream) {
+    if (!theirVideoRef.current || !myCamera) {
       return;
     }
     let remoteStream: MediaStream;
     if (props.call) {
-      remoteStream = await makeCall(props.call, props.signaller, myStream);
+      remoteStream = await makeCall(props.call, props.signaller, myCamera);
       console.log('got remote stream after calling');
     } else {
-      remoteStream = await listen(props.signaller, myStream);
+      remoteStream = await listen(props.signaller, myCamera);
       console.log('got remote stream after listenning');
     }
     const video = theirVideoRef.current;
@@ -118,33 +134,45 @@ function Room(props: { signaller: Signaller; call?: ID }) {
 
   React.useEffect(() => {
     setupTheirStream();
-  }, [myStream, theirVideoRef]);
+  }, [myCamera, theirVideoRef]);
 
   return (
-    <div
-      className={`transition-colors duration-500 w-full h-screen relative ${
-        connected ? 'bg-gray-900' : 'bg-main-100'
-      }`}
-    >
-      <video
-        autoPlay
-        playsInline
-        controls={false}
-        ref={theirVideoRef}
-        className="w-full h-full"
-      ></video>
-      <div className="rounded-md shadow-lg mt-8 mr-8 mb-8 w-32 sm:w-48 lg:w-64 absolute right-0 top-0 sm:top-auto sm:bottom-0">
+    <>
+      <div
+        className={`transition-colors duration-500 w-full h-screen relative ${
+          connected ? 'bg-gray-900' : 'bg-main-100'
+        }`}
+      >
         <video
-          className="rounded-md w-full"
           autoPlay
           playsInline
           controls={false}
-          ref={myVideoRef}
+          ref={theirVideoRef}
+          className="w-full h-full"
+        ></video>
+        <div className="absolute top-0 right-0 w-32 mt-8 mb-8 mr-8 rounded-md shadow-lg sm:w-48 lg:w-64 sm:top-auto sm:bottom-0">
+          <video
+            className="w-full rounded-md"
+            autoPlay
+            playsInline
+            controls={false}
+            ref={myVideoRef}
+            muted
+          ></video>
+        </div>
+        <Buttons id={props.call ?? props.signaller.id} media={myCamera} />
+        <video
+          autoPlay
+          playsInline
+          ref={waitingVideoRef}
+          className="invisible w-0"
+          controls={false}
+          loop
           muted
+          src="/Nya.mp4"
         ></video>
       </div>
-      <Buttons id={props.call ?? props.signaller.id} media={myStream} />
-    </div>
+    </>
   );
 }
 
