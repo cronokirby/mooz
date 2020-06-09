@@ -130,6 +130,37 @@ function Buttons({
   );
 }
 
+function Video(props: {
+  className: string;
+  media: MediaStream;
+  muted: boolean;
+}) {
+  const ref = React.useRef(null as HTMLVideoElement | null);
+
+  React.useEffect(() => {
+    if (!ref.current) {
+      return;
+    }
+    const video = ref.current;
+    if ('srcObject' in video) {
+      video.srcObject = props.media;
+    } else {
+      // For older browsers
+      (video as any).src = window.URL.createObjectURL(props.media);
+    }
+  }, [ref]);
+  return (
+    <video
+      autoPlay
+      playsInline
+      muted={props.muted}
+      controls={false}
+      ref={ref}
+      className={props.className}
+    ></video>
+  );
+}
+
 interface Props {
   id: ID;
   created?: boolean;
@@ -138,12 +169,12 @@ interface Props {
 export default function Page(props: Props) {
   const { current: myID } = React.useRef(props.created ? props.id : newID());
   const [room, setRoom] = React.useState(null as Room | null);
-  const myVideoRef = React.useRef(null as HTMLVideoElement | null);
-  const theirVideoRef = React.useRef(null as HTMLVideoElement | null);
   const waitingVideoRef = React.useRef(null as HTMLVideoElement | null);
   const [myCamera, setMyCamera] = React.useState(null as MediaStream | null);
   const [myWaiting, setMyWaiting] = React.useState(null as MediaStream | null);
-  const [connected, setConnected] = React.useState(false);
+  const [remoteStream, setRemoteStream] = React.useState(
+    null as MediaStream | null,
+  );
   const [showWaiting, setShowWaiting] = React.useState(false);
 
   const setupMyWaiting = async () => {
@@ -166,15 +197,11 @@ export default function Page(props: Props) {
   }, [waitingVideoRef]);
 
   const setupMyCamera = async () => {
-    if (!myVideoRef.current) {
-      return;
-    }
     try {
       const stream = await getWebCamMedia();
       if (!stream) {
         return;
       }
-      myVideoRef.current.srcObject = stream;
       setMyCamera(stream);
     } catch (error) {
       console.warn('error setting up video', error);
@@ -183,56 +210,41 @@ export default function Page(props: Props) {
 
   React.useEffect(() => {
     setupMyCamera();
-  }, [myVideoRef]);
+  }, []);
 
   const setupRoom = () => {
-    if (!theirVideoRef.current || !myCamera) {
+    if (!myCamera) {
       return;
     }
-    const cb = (stream: MediaStream) => {
-      setConnected(true);
-      const video = theirVideoRef.current as HTMLVideoElement;
-      if ('srcObject' in video) {
-        video.srcObject = stream;
-      } else {
-        // For older browsers
-        (video as any).src = window.URL.createObjectURL(stream);
-      }
-    };
     let room: Room;
     if (props.created) {
-      room = Room.host(myID, myCamera, cb);
+      room = Room.host(myID, myCamera, setRemoteStream);
     } else {
-      room = Room.join(myID, props.id, myCamera, cb);
+      room = Room.join(myID, props.id, myCamera, setRemoteStream);
     }
     setRoom(room);
   };
 
-  React.useEffect(setupRoom, [myCamera, theirVideoRef]);
+  React.useEffect(setupRoom, [myCamera]);
 
   return (
     <>
       <div
         className={`transition-colors duration-500 w-full h-screen relative ${
-          connected ? 'bg-gray-900' : 'bg-main-100'
+          remoteStream ? 'bg-gray-900' : 'bg-main-100'
         }`}
       >
-        <video
-          autoPlay
-          playsInline
-          controls={false}
-          ref={theirVideoRef}
-          className="w-full h-full"
-        ></video>
+        {!remoteStream ? null : (
+          <Video className="w-full h-full" media={remoteStream} muted={false} />
+        )}
         <div className="absolute top-0 right-0 w-32 mt-8 mb-8 mr-8 rounded-md shadow-lg sm:w-48 lg:w-64 sm:top-auto sm:bottom-0">
-          <video
-            className={!showWaiting ? 'w-full rounded-md' : 'invisible w-0'}
-            autoPlay
-            playsInline
-            controls={false}
-            ref={myVideoRef}
-            muted
-          ></video>
+          {!myCamera ? null : (
+            <Video
+              className={!showWaiting ? 'w-full rounded-md' : 'invisible w-0'}
+              media={myCamera}
+              muted={true}
+            />
+          )}
           <video
             autoPlay
             playsInline
