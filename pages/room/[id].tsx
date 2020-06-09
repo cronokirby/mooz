@@ -21,7 +21,7 @@ function Button(props: React.PropsWithChildren<ButtonProps>) {
 }
 
 function ShareButton({ id }: { id: ID }) {
-  const url = `https://mooz.cronokirby.now.sh/room/${id}`;
+  const url = `https://mooz.cronokirby.com/room/${id}`;
   const title = `Mooz meeting ${id}`;
 
   const share = () => {
