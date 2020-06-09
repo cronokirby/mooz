@@ -1,11 +1,9 @@
 import { NextPageContext } from 'next';
 import React from 'react';
 import * as icons from '../../components/icons';
-import { listen, makeCall, CallResult } from '../../src/frontend/calling';
-import Signaller from '../../src/frontend/Signaller';
-import type { ID } from '../../src/identifier';
-import { getWebCamMedia, getWaitingMedia } from '../../src/frontend/media';
-import type { Instance as Peer } from 'simple-peer';
+import { getWaitingMedia, getWebCamMedia } from '../../src/frontend/media';
+import Room from '../../src/frontend/Room';
+import { ID, newID } from '../../src/identifier';
 
 interface ButtonProps {
   onClick(): void;
@@ -73,24 +71,22 @@ function MuteButton({ media }: { media: MediaStream }) {
 function VideoButton(props: {
   media: MediaStream;
   waitingMedia: MediaStream;
-  peer: Peer;
+  room: Room;
   showWaiting: boolean;
   setShowWaiting: (b: boolean) => void;
 }) {
-  const { setShowWaiting, showWaiting, media, waitingMedia, peer } = props;
+  const { setShowWaiting, showWaiting, media, waitingMedia, room } = props;
   const onClick = () => {
     if (!showWaiting) {
-      peer.replaceTrack(
+      room.replaceTrack(
         media.getVideoTracks()[0],
         waitingMedia.getVideoTracks()[0],
-        media,
       );
       setShowWaiting(true);
     } else {
-      peer.replaceTrack(
+      room.replaceTrack(
         waitingMedia.getVideoTracks()[0],
         media.getVideoTracks()[0],
-        media,
       );
       setShowWaiting(false);
     }
@@ -106,14 +102,14 @@ function Buttons({
   id,
   media,
   waitingMedia,
-  peer,
+  room,
   showWaiting,
   setShowWaiting,
 }: {
   id: ID;
   media: MediaStream | null;
   waitingMedia: MediaStream | null;
-  peer: Peer | null;
+  room: Room | null;
   showWaiting: boolean;
   setShowWaiting: (b: boolean) => void;
 }) {
@@ -121,11 +117,11 @@ function Buttons({
     <div className="absolute bottom-0 left-0 flex flex-col justify-between p-8 space-y-4 md:p-16">
       <ShareButton id={id} />
       {!media ? null : <MuteButton media={media} />}
-      {!waitingMedia || !media || !peer ? null : (
+      {!waitingMedia || !media || !room ? null : (
         <VideoButton
           media={media}
           waitingMedia={waitingMedia}
-          peer={peer}
+          room={room}
           showWaiting={showWaiting}
           setShowWaiting={setShowWaiting}
         />
@@ -134,14 +130,20 @@ function Buttons({
   );
 }
 
-function Room(props: { signaller: Signaller; call?: ID }) {
+interface Props {
+  id: ID;
+  created?: boolean;
+}
+
+export default function Page(props: Props) {
+  const { current: myID } = React.useRef(props.created ? props.id : newID());
+  const [room, setRoom] = React.useState(null as Room | null);
   const myVideoRef = React.useRef(null as HTMLVideoElement | null);
   const theirVideoRef = React.useRef(null as HTMLVideoElement | null);
   const waitingVideoRef = React.useRef(null as HTMLVideoElement | null);
   const [myCamera, setMyCamera] = React.useState(null as MediaStream | null);
   const [myWaiting, setMyWaiting] = React.useState(null as MediaStream | null);
   const [connected, setConnected] = React.useState(false);
-  const [peer, setPeer] = React.useState(null as Peer | null);
   const [showWaiting, setShowWaiting] = React.useState(false);
 
   const setupMyWaiting = async () => {
@@ -183,33 +185,30 @@ function Room(props: { signaller: Signaller; call?: ID }) {
     setupMyCamera();
   }, [myVideoRef]);
 
-  const setupTheirStream = async () => {
+  const setupRoom = () => {
     if (!theirVideoRef.current || !myCamera) {
       return;
     }
-    let result: CallResult;
-    if (props.call) {
-      result = await makeCall(props.call, props.signaller, myCamera);
-      console.log('got remote stream after calling');
+    const cb = (stream: MediaStream) => {
+      setConnected(true);
+      const video = theirVideoRef.current as HTMLVideoElement;
+      if ('srcObject' in video) {
+        video.srcObject = stream;
+      } else {
+        // For older browsers
+        (video as any).src = window.URL.createObjectURL(stream);
+      }
+    };
+    let room: Room;
+    if (props.created) {
+      room = Room.host(myID, myCamera, cb);
     } else {
-      result = await listen(props.signaller, myCamera);
-      console.log('got remote stream after listenning');
+      room = Room.join(myID, props.id, myCamera, cb);
     }
-    const { peer, stream } = result;
-    setPeer(peer);
-    const video = theirVideoRef.current;
-    if ('srcObject' in video) {
-      video.srcObject = stream;
-    } else {
-      // For older browsers
-      (video as any).src = window.URL.createObjectURL(stream);
-    }
-    setConnected(true);
+    setRoom(room);
   };
 
-  React.useEffect(() => {
-    setupTheirStream();
-  }, [myCamera, theirVideoRef]);
+  React.useEffect(setupRoom, [myCamera, theirVideoRef]);
 
   return (
     <>
@@ -246,39 +245,16 @@ function Room(props: { signaller: Signaller; call?: ID }) {
           ></video>
         </div>
         <Buttons
-          id={props.call ?? props.signaller.id}
+          id={props.id}
           media={myCamera}
           waitingMedia={myWaiting}
-          peer={peer}
+          room={room}
           showWaiting={showWaiting}
           setShowWaiting={setShowWaiting}
         />
       </div>
     </>
   );
-}
-
-interface Props {
-  id: ID;
-  created?: boolean;
-}
-
-export default function Page({ id, created }: Props) {
-  const [signaller, setSignaller] = React.useState(null as Signaller | null);
-
-  React.useEffect(() => {
-    if (created) {
-      setSignaller(new Signaller(id));
-    } else {
-      setSignaller(new Signaller());
-    }
-  }, []);
-
-  if (!signaller) {
-    return <p>waiting...</p>;
-  } else {
-    return <Room signaller={signaller} call={!created ? id : undefined} />;
-  }
 }
 
 Page.getInitialProps = async (ctx: NextPageContext) => {
