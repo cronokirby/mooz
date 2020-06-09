@@ -53,7 +53,6 @@ function toggleMute(media: MediaStream) {
 }
 
 function MuteButton({ media }: { media: MediaStream }) {
-  console.log(isMuted(media));
   const [muted, setMuted] = React.useState(isMuted(media));
 
   const onClick = () => {
@@ -172,9 +171,9 @@ export default function Page(props: Props) {
   const waitingVideoRef = React.useRef(null as HTMLVideoElement | null);
   const [myCamera, setMyCamera] = React.useState(null as MediaStream | null);
   const [myWaiting, setMyWaiting] = React.useState(null as MediaStream | null);
-  const [remoteStream, setRemoteStream] = React.useState(
-    null as MediaStream | null,
-  );
+  const [remoteStreams, setRemoteStreams] = React.useState([] as MediaStream[]);
+  const addStream = (stream: MediaStream) =>
+    setRemoteStreams((rs) => [...rs, stream]);
   const [showWaiting, setShowWaiting] = React.useState(false);
 
   const setupMyWaiting = async () => {
@@ -218,9 +217,9 @@ export default function Page(props: Props) {
     }
     let room: Room;
     if (props.created) {
-      room = Room.host(myID, myCamera, setRemoteStream);
+      room = Room.host(myID, myCamera, addStream);
     } else {
-      room = Room.join(myID, props.id, myCamera, setRemoteStream);
+      room = Room.join(myID, props.id, myCamera, addStream);
     }
     setRoom(room);
   };
@@ -231,12 +230,16 @@ export default function Page(props: Props) {
     <>
       <div
         className={`transition-colors duration-500 w-full h-screen relative ${
-          remoteStream ? 'bg-gray-900' : 'bg-main-100'
+          remoteStreams.length > 0 ? 'bg-gray-900' : 'bg-main-100'
         }`}
       >
-        {!remoteStream ? null : (
-          <Video className="w-full h-full" media={remoteStream} muted={false} />
-        )}
+        <ul className="flex flex-col items-center w-full h-full sm:flex-row md:flex-col lg:flex-row">
+          {remoteStreams.map((stream, i) => (
+            <li key={i} className="w-full h-full">
+              <Video className="w-full h-full" muted={false} media={stream} />
+            </li>
+          ))}
+        </ul>
         <div className="absolute top-0 right-0 w-32 mt-8 mb-8 mr-8 rounded-md shadow-lg sm:w-48 lg:w-64 sm:top-auto sm:bottom-0">
           {!myCamera ? null : (
             <Video

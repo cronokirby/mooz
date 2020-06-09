@@ -27,7 +27,7 @@ function getPusherInstance(): Pusher {
 
 /**
  * Listen to incoming messages directed towards this ID, and handle them with a callback
- * 
+ *
  * @param to the ID to listen for
  * @param cb the function to call when messages arrive
  */
@@ -35,7 +35,10 @@ function listen(to: ID, cb: (msg: Message) => void) {
   const pusher = getPusherInstance();
   const channel = pusher.subscribe(to);
   // We could do validation here, but oh well
-  channel.bind('signal', cb);
+  channel.bind('signal', (msg: any) => {
+    console.log('received', msg);
+    cb(msg);
+  });
 }
 
 async function postData(url: string, data: any) {
@@ -51,11 +54,12 @@ async function postData(url: string, data: any) {
 
 /**
  * Send a message to some identifier
- * 
+ *
  * @param message the message to send
  * @param to the identifier of the person to send the message to
  */
 async function send(message: Message, to: ID) {
+  console.log('sending', message, to);
   await postData(`/api/messages/${to}`, message);
 }
 
@@ -63,7 +67,7 @@ type OnCallCB = (stream: MediaStream) => void;
 
 /**
  * Represents a Room where can we join multiple video calls between different people.
- * 
+ *
  * In practice this represents a mesh architecture, where each peer is connected to
  * each other peer. The interface abstracts all of that away. The room just lets us
  * know when new video streams arrive.
@@ -71,7 +75,7 @@ type OnCallCB = (stream: MediaStream) => void;
 export default class Room {
   /**
    * This joins an existing room, that we don't own
-   * 
+   *
    * @param myID the identifier we have
    * @param roomID the room we're joining
    * @param stream our media stream to send to the other users
@@ -85,7 +89,7 @@ export default class Room {
 
   /**
    * Create a new room and act as the host
-   * 
+   *
    * @param myID our ID, and the room ID as well
    * @param stream the media stream we'll send to other users
    * @param cb what to do when new streams arrive
@@ -168,9 +172,9 @@ export default class Room {
 
   /**
    * Replace the current track we're streaming with a new track
-   * 
+   *
    * This allows us to replace the video feed, for example.
-   * 
+   *
    * @param oldTrack the old track
    * @param newTrack the new track
    */
