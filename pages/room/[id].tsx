@@ -1,10 +1,11 @@
 import { NextPageContext } from 'next';
 import React from 'react';
 import * as icons from '../../components/icons';
-import { listen, makeCall } from '../../src/frontend/calling';
+import { listen, makeCall, CallResult } from '../../src/frontend/calling';
 import Signaller from '../../src/frontend/Signaller';
 import type { ID } from '../../src/identifier';
 import { getWebCamMedia, getWaitingMedia } from '../../src/frontend/media';
+import type { Instance as Peer } from 'simple-peer';
 
 interface ButtonProps {
   onClick(): void;
@@ -69,11 +70,66 @@ function MuteButton({ media }: { media: MediaStream }) {
   );
 }
 
-function Buttons({ id, media }: { id: ID; media: MediaStream | null }) {
+function VideoButton(props: {
+  media: MediaStream;
+  waitingMedia: MediaStream;
+  peer: Peer;
+  showWaiting: boolean;
+  setShowWaiting: (b: boolean) => void;
+}) {
+  const { setShowWaiting, showWaiting, media, waitingMedia, peer } = props;
+  const onClick = () => {
+    if (!showWaiting) {
+      peer.replaceTrack(
+        media.getVideoTracks()[0],
+        waitingMedia.getVideoTracks()[0],
+        media,
+      );
+      setShowWaiting(true);
+    } else {
+      peer.replaceTrack(
+        waitingMedia.getVideoTracks()[0],
+        media.getVideoTracks()[0],
+        media,
+      );
+      setShowWaiting(false);
+    }
+  };
+  return (
+    <Button onClick={onClick}>
+      {showWaiting ? icons.VidOff(32) : icons.VidOn(32)}
+    </Button>
+  );
+}
+
+function Buttons({
+  id,
+  media,
+  waitingMedia,
+  peer,
+  showWaiting,
+  setShowWaiting,
+}: {
+  id: ID;
+  media: MediaStream | null;
+  waitingMedia: MediaStream | null;
+  peer: Peer | null;
+  showWaiting: boolean;
+  setShowWaiting: (b: boolean) => void;
+}) {
   return (
     <div className="absolute bottom-0 left-0 flex flex-col justify-between p-8 space-y-4 md:p-16">
       <ShareButton id={id} />
       {!media ? null : <MuteButton media={media} />}
+      {!waitingMedia || !media || !peer ? null : (
+        <VideoButton
+          media={media}
+          waitingMedia={waitingMedia}
+          peer={peer}
+          showWaiting={showWaiting}
+          setShowWaiting={setShowWaiting}
+        />
+      )}
     </div>
   );
 }
@@ -84,13 +140,31 @@ function Room(props: { signaller: Signaller; call?: ID }) {
   const waitingVideoRef = React.useRef(null as HTMLVideoElement | null);
   const [myCamera, setMyCamera] = React.useState(null as MediaStream | null);
   const [myWaiting, setMyWaiting] = React.useState(null as MediaStream | null);
-  const [error, setError] = React.useState('');
   const [connected, setConnected] = React.useState(false);
+  const [peer, setPeer] = React.useState(null as Peer | null);
+  const [showWaiting, setShowWaiting] = React.useState(false);
 
-  const setupMyWaiting = async () => {};
+  const setupMyWaiting = async () => {
+    if (!waitingVideoRef.current) {
+      return;
+    }
+    try {
+      const stream = await getWaitingMedia(waitingVideoRef.current);
+      if (!stream) {
+        return;
+      }
+      setMyWaiting(stream);
+    } catch (error) {
+      console.warn('error setting up video', error);
+    }
+  };
+
+  React.useEffect(() => {
+    setupMyWaiting();
+  }, [waitingVideoRef]);
 
   const setupMyCamera = async () => {
-    if (!myVideoRef.current || !waitingVideoRef.current) {
+    if (!myVideoRef.current) {
       return;
     }
     try {
@@ -102,32 +176,33 @@ function Room(props: { signaller: Signaller; call?: ID }) {
       setMyCamera(stream);
     } catch (error) {
       console.warn('error setting up video', error);
-      setError(`Error setting up video: ${error}`);
     }
   };
 
   React.useEffect(() => {
     setupMyCamera();
-  }, [myVideoRef, waitingVideoRef]);
+  }, [myVideoRef]);
 
   const setupTheirStream = async () => {
     if (!theirVideoRef.current || !myCamera) {
       return;
     }
-    let remoteStream: MediaStream;
+    let result: CallResult;
     if (props.call) {
-      remoteStream = await makeCall(props.call, props.signaller, myCamera);
+      result = await makeCall(props.call, props.signaller, myCamera);
       console.log('got remote stream after calling');
     } else {
-      remoteStream = await listen(props.signaller, myCamera);
+      result = await listen(props.signaller, myCamera);
       console.log('got remote stream after listenning');
     }
+    const { peer, stream } = result;
+    setPeer(peer);
     const video = theirVideoRef.current;
     if ('srcObject' in video) {
-      video.srcObject = remoteStream;
+      video.srcObject = stream;
     } else {
       // For older browsers
-      (video as any).src = window.URL.createObjectURL(remoteStream);
+      (video as any).src = window.URL.createObjectURL(stream);
     }
     setConnected(true);
   };
@@ -152,25 +227,32 @@ function Room(props: { signaller: Signaller; call?: ID }) {
         ></video>
         <div className="absolute top-0 right-0 w-32 mt-8 mb-8 mr-8 rounded-md shadow-lg sm:w-48 lg:w-64 sm:top-auto sm:bottom-0">
           <video
-            className="w-full rounded-md"
+            className={!showWaiting ? 'w-full rounded-md' : 'invisible w-0'}
             autoPlay
             playsInline
             controls={false}
             ref={myVideoRef}
             muted
           ></video>
+          <video
+            autoPlay
+            playsInline
+            ref={waitingVideoRef}
+            className={showWaiting ? 'w-full rounded-md' : 'invisible w-0'}
+            controls={false}
+            loop
+            muted
+            src="/Nya.mp4"
+          ></video>
         </div>
-        <Buttons id={props.call ?? props.signaller.id} media={myCamera} />
-        <video
-          autoPlay
-          playsInline
-          ref={waitingVideoRef}
-          className="invisible w-0"
-          controls={false}
-          loop
-          muted
-          src="/Nya.mp4"
-        ></video>
+        <Buttons
+          id={props.call ?? props.signaller.id}
+          media={myCamera}
+          waitingMedia={myWaiting}
+          peer={peer}
+          showWaiting={showWaiting}
+          setShowWaiting={setShowWaiting}
+        />
       </div>
     </>
   );
