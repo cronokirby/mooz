@@ -233,6 +233,10 @@ export default function Page(props: Props) {
           remoteStreams.length > 0 ? 'bg-gray-900' : 'bg-main-100'
         }`}
       >
+        <img
+          className={remoteStreams.length > 0 ? 'hidden' : 'w-full h-full object-contain object-center'}
+          src="/loading.svg"
+        ></img>
         <ul className="flex flex-col items-center w-full h-full sm:flex-row md:flex-col lg:flex-row">
           {remoteStreams.map((stream, i) => (
             <li key={i} className="w-full h-full">
